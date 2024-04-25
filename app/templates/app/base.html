@@ -59,6 +59,19 @@
            <input class="form-control me-2" type="search" placeholder="Search" name="q" aria-label="Search">
            <button class="btn btn-warning" type="submit">S</button>
          </form>
+        <!-- base.html -->
+          <div class="dropdown ms-2 me-2">
+            <a class="btn btn-secondary dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Top leads
+            </a>
+            
+            <ul class="dropdown-menu">
+                {% for lead_user in lead_users %}
+                    <li><p class="dropdown-item" style="margin:0px;">{{ lead_user.user.username }}</p></li>
+                {% endfor %}
+            </ul>
+          </div>
+
          <div>
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           {% if request.user.is_authenticated %}
