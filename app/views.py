@@ -229,11 +229,11 @@ def sp_payment_done(request, product_id):
 @login_required
 def payment_done(request):
     if request.method == "POST":
-        custid = request.GET.get('custid')
+        
         user = request.user
         
         try:
-            customer = Customer.objects.get(id=custid)
+            customer = Customer.objects.get(user=user)
             
             for cart_item in Cart.objects.filter(user=user):
                 order_spec = create_order(user, customer, cart_item.product, cart_item.quantity)
@@ -241,7 +241,7 @@ def payment_done(request):
                 cart_item.delete()
         
         except Customer.DoesNotExist:
-            print("Customer with ID", custid, "does not exist")
+            print("Customer with ID", user, "does not exist")
 
         return redirect("orders")
 
