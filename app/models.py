@@ -84,3 +84,10 @@ class feedback(models.Model):
   product = models.ForeignKey(Product, on_delete=models.CASCADE, default="", related_name="Product")
   rate_num =  models.PositiveIntegerField(db_index=True)
   experience = models.TextField(db_index=True)
+
+class Contact(models.Model):
+  user = models.ForeignKey(User, on_delete=models.CASCADE, default="")
+  full_name = models.CharField(max_length=100, db_index=True)
+  email = models.EmailField(db_index=True)
+  subject = models.CharField(max_length=200, db_index=True)
+  message = models.TextField(db_index=True)

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, HttpResponse, get_object_or_404
-from .models import Customer, Product, Cart, OrderPlaced, feedback, leaderboard
+from .models import Customer, Product, Cart, OrderPlaced, feedback, leaderboard, Contact
 from .forms import CustomerRegistrationForm, CustomerProfileForm
 from django.views import View
 from django.contrib import messages
@@ -8,6 +8,8 @@ from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.utils import timezone
+from decimal import Decimal
+
 
 class ProductView(View):
     def get(self, request):
@@ -66,8 +68,7 @@ def add_to_cart(request):
         return redirect('/cart')
     else:
         return redirect('/cart')
-    # Below Code is used to return to the same page
-    # return redirect(request.META['HTTP_REFERER'])
+ 
 
 @login_required
 def show_cart(request):
@@ -76,16 +77,20 @@ def show_cart(request):
         totalitem = len(Cart.objects.filter(user=request.user))
         user = request.user
         cart = Cart.objects.filter(user=user)
+
         amount = 0.0
         shipping_amount = 70.0
         totalamount = 0.0
         cart_product = [p for p in Cart.objects.all() if p.user == request.user]
+        
         lead_users = leaderboard.objects.filter(leaderScore__gt=20).order_by('-leaderScore')
         if cart_product:
             for p in cart_product:
-                tempamount = (p.quantity * p.product.discounted_price)
+                tempamount = (p.quantity * p.product.selling_price)
                 amount += tempamount
                 totalamount = amount + shipping_amount
+              
+
             return render(request, 'app/addtocart.html', {'carts': cart, 'amount': amount, 'totalamount': totalamount, 'totalitem': totalitem, "lead_users":lead_users})
         else:
             return render(request, 'app/emptycart.html', {'totalitem': totalitem, "lead_users":lead_users})
@@ -138,13 +143,40 @@ def minus_cart(request):
 
 @login_required
 def checkout(request):
-	user = request.user
+    user = request.user
 
-	add = Customer.objects.filter(user=user)
-	cart_items = Cart.objects.filter(user=request.user)
-	lead_users = leaderboard.objects.filter(leaderScore__gt=20).order_by('-leaderScore')
+    add = Customer.objects.filter(user=user)
+    cart_items = Cart.objects.filter(user=request.user)
+    lead_users = leaderboard.objects.filter(leaderScore__gt=20).order_by('-leaderScore')
+    leaderboard_entry = leaderboard.objects.filter(user=user).first()
+    
+    # Check if qualify
+    if leaderboard_entry:
+        score = analyzer(leaderboard_entry.leaderScore)
+    else:
+        score = 0
+    
+    total_original_price = Decimal(0)
+    total_discounted_price = Decimal(0)
+    per_item_discount_price = {}  # Dictionary to store per-item discounted prices
+    for item in cart_items:
+        original_price = Decimal(item.product.selling_price) * Decimal(item.quantity)
+        total_original_price += original_price
+        print(item.product.title)
+        print(item.product.selling_price)
 
-	return render(request, 'app/checkout.html', {'add':add, 'cart_items':cart_items, "lead_users":lead_users})
+        # Apply discount if the user qualifies
+        if score >= 20:
+            discounted_price = original_price * Decimal('0.8')  # 20% discount
+            per_item_discount_price[item.id] = discounted_price  # Store discounted price by item ID
+        else:
+            per_item_discount_price[item.id] = original_price  # Store original price by item ID
+            
+        total_discounted_price += per_item_discount_price[item.id]
+    
+    return render(request, 'app/checkout.html', {'add': add, 'cart_items': cart_items, "lead_users": lead_users, 'total_original_price': total_original_price, 'total_discounted_price': total_discounted_price, "discount_for_score":score, "per_item_discount_price":per_item_discount_price})
+
+
 
 @login_required
 def sp_checkout(request, id):
@@ -159,6 +191,7 @@ def sp_checkout(request, id):
         # Retrieve a single leaderboard object for the user
         leaderboard_entry = leaderboard.objects.filter(user=user).first()
         lead_users = leaderboard.objects.filter(leaderScore__gt=20).order_by('-leaderScore')
+        
         # Check if leaderboard_entry exists before accessing its attributes
         if leaderboard_entry:
             score = analyzer(leaderboard_entry.leaderScore)
@@ -168,11 +201,9 @@ def sp_checkout(request, id):
         # Calculate the discounted price based on the original price and the discount percentage
         discount_percentage = 20  # Assuming a 20% discount
         discounted_price = product.selling_price * (1 - discount_percentage / 100)
-      
         # Calculate the discount amount
         discount_amount = product.selling_price - discounted_price
         
-      
     except Product.DoesNotExist:
         return redirect("product-detail", pk=id)
 
@@ -197,21 +228,22 @@ def sp_payment_done(request, product_id):
 
 @login_required
 def payment_done(request):
-    custid = request.GET.get('custid')
-    user = request.user
-    
-    try:
-        customer = Customer.objects.get(id=custid)
+    if request.method == "POST":
+        custid = request.GET.get('custid')
+        user = request.user
         
-        for cart_item in Cart.objects.filter(user=user):
-            order_spec = create_order(user, customer, cart_item.product, cart_item.quantity)
-            update_leaderboard(user, order_spec.product.selling_price)
-            cart_item.delete()
-    
-    except Customer.DoesNotExist:
-        print("Customer with ID", custid, "does not exist")
+        try:
+            customer = Customer.objects.get(id=custid)
+            
+            for cart_item in Cart.objects.filter(user=user):
+                order_spec = create_order(user, customer, cart_item.product, cart_item.quantity)
+                update_leaderboard(user, order_spec.product.selling_price)
+                cart_item.delete()
+        
+        except Customer.DoesNotExist:
+            print("Customer with ID", custid, "does not exist")
 
-    return redirect("orders")
+        return redirect("orders")
 
 
 def remove_cart(request):
@@ -342,22 +374,22 @@ def filter_products(request):
 
     # Render the template with the context
     return render(request, 'app/search.html', context)
-
+# View for providing feedback on a product
 @login_required
 def feed_back(request, pro_id):
     if request.method == "POST":
         rating = request.POST.get("exp")
         experience = request.POST.get("msg")
-    
+        
         try:
             product = Product.objects.get(id=pro_id)
         except Product.DoesNotExist:
-        
+            # Redirect to product detail page if product not found
             return redirect("product-detail", pk=pro_id)
 
         # Validate input
         if not rating or not experience:
-            return HttpResponse("Please provide both rating and experience.", status=400)
+            return redirect("product-detail", pk=pro_id)
         
         try:
             # Create Feedback object
@@ -367,15 +399,16 @@ def feed_back(request, pro_id):
                 experience=experience,
                 product=product
             )
-            # Optionally, you can return a success message or redirect the user
-            return HttpResponse("Feedback submitted successfully.")
+            # Redirect to product detail page after successful feedback submission
+            return redirect("product-detail", pk=pro_id)
         except Exception as e:
             # Handle exceptions gracefully
-            return HttpResponse(f"An error occurred: {str(e)}", status=500)
-    
+            return redirect("product-detail", pk=pro_id)
+
     # Render a form for submitting feedback
     return redirect("product-detail", pk=pro_id)
 
+# Helper function for processing checkout for a product
 @login_required
 def sq_checkout_helper(request, id=None):
     if request.method == "POST":
@@ -387,13 +420,22 @@ def sq_checkout_helper(request, id=None):
         state = request.POST.get("state")
 
         if full_name and address and city and zipcode and state:
-            Customer.objects.create(user=user, name=full_name, locality=address, city=city, zipcode=zipcode, state=state)
+            # Create Customer object
+            Customer.objects.create(
+                user=user,
+                name=full_name,
+                locality=address,
+                city=city,
+                zipcode=zipcode,
+                state=state
+            )
             print("Customer created")
             return redirect("spcheckout", id=id)
         else:
             print("Please provide all fields")
             return redirect("spcheckout", id=id)
-        
+
+# Helper function for processing checkout
 @login_required
 def checkout_helper(request):
     if request.method == "POST":
@@ -405,13 +447,51 @@ def checkout_helper(request):
         state = request.POST.get("state")
 
         if full_name and address and city and zipcode and state:
-            Customer.objects.create(user=user, name=full_name, locality=address, city=city, zipcode=zipcode, state=state)
+            # Create Customer object
+            Customer.objects.create(
+                user=user,
+                name=full_name,
+                locality=address,
+                city=city,
+                zipcode=zipcode,
+                state=state
+            )
             print("Customer created")
             return redirect("checkout")
         else:
             print("Please provide all fields")
             return redirect("checkout")
 
+# View for displaying leaderboard and contact form
+@method_decorator(login_required, name='dispatch')
+class Contactor(View):
+    def get(self, request, *args, **kwargs):
+        # Fetch users with a leaderboard score greater than 20 and order by score
+        lead_users = leaderboard.objects.filter(leaderScore__gt=20).order_by('-leaderScore')
+        return render(request, 'app/contact.html', {"lead_users": lead_users})
+    
+    def post(self, request, *args, **kwargs):
+        full_name = request.POST.get("fullname")
+        email = request.POST.get("email")
+        subject = request.POST.get("subject")
+        message = request.POST.get("msg")
+
+        if full_name and email and subject and message:
+            # Create Contact object
+            Contact.objects.create(
+                user=request.user,
+                full_name=full_name,
+                email=email,
+                subject=subject,
+                message=message
+            )
+            return redirect("contact")
+        else:
+            print("Please provide all credentials")
+            # Use message framework for displaying error message
+            return redirect("contact")
+
+# Function for creating an order
 def create_order(user, customer, product, quantity=1):
     return OrderPlaced.objects.create(
         user=user,
@@ -420,6 +500,7 @@ def create_order(user, customer, product, quantity=1):
         quantity=quantity
     )
 
+# Function for updating leaderboard
 def update_leaderboard(user, price):
     # Update the leaderboard score based on the price of the purchased item
     leaderboard_entry, created = leaderboard.objects.get_or_create(user=user)
@@ -429,6 +510,7 @@ def update_leaderboard(user, price):
     leaderboard_entry.last_purchase_date = timezone.now()
     leaderboard_entry.save()
 
+# Function for calculating leaderboard score
 def calculate_leader_score(price):
     # Calculate the leaderboard score based on the price of the purchased item
     if price > 10000:
@@ -439,10 +521,11 @@ def calculate_leader_score(price):
         return 5
     else:
         return 2
-    
+
+# Function for analyzing leaderboard score and providing discount
 def analyzer(score):
-     if score > 20:
-        #   Return 20 percentage discount
-          return 20
-     else:
-          return 0
+    if score > 20:
+        # Return 20 percentage discount
+        return 20
+    else:
+        return 0

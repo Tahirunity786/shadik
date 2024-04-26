@@ -48,4 +48,5 @@ urlpatterns = [
     path('search/', views.filter_products, name='search'),
     path('feedback/<int:pro_id>/', views.feed_back, name='feedback'),
     path('leader-board/', views.update_leaderboard, name='leaderboard'),
+    path('contact', views.Contactor.as_view(), name='contact'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

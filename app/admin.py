@@ -5,12 +5,17 @@ from .models import (
  Customer,
  Product,
  Cart,
- OrderPlaced
+ OrderPlaced, 
+ Contact
 )
 
 @admin.register(Customer)
 class CustomerModelAdmin(admin.ModelAdmin):
  list_display = ['id', 'user', 'name', 'locality', 'city', 'zipcode', 'state']
+
+@admin.register(Contact)
+class CustomerModelAdmin(admin.ModelAdmin):
+ list_display = ['id', 'user', 'full_name', 'email', 'subject', 'message']
 
 @admin.register(Product)
 class ProductModelAdmin(admin.ModelAdmin):

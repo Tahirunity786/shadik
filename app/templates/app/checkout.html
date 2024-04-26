@@ -1,4 +1,5 @@
 {% extends 'app/base.html' %}
+{% load filters %}
 {% load static %}
 {% block title %}Checkout{% endblock title %}
 {% block main-content %}
@@ -17,22 +18,30 @@
         {% if discount %}
 
         <h5 class="mt-3 mb-2">Congratulation you have get {{discount}}% discount </h5>
-        <p class="fw-bold">Total Price: {{ discounted_price }}</p>
+        <p class="fw-bold">Total Price: {{ discounted_price|add:70 }}</p>
             {% comment %} <p>Discount ({{ discount }}%): -{{ discount_amount }}</p> {% endcomment %}
         {% endif %}
       </div>
     </div>
   {% endfor %}
     {% else %}
+    <p>Cart items Checkout</p>
     {% for item in cart_items %}
-      <div class="card mb-2">
+    <div class="card mb-2">
         <div class="card-body">
-          <h5>Product: {{item.product.title}}</h5>
-          <p>Quantity: {{item.quantity}}</p>
-          <p class="fw-bold">Price: {{item.total_cost}}</p>
+            <h5>Product: {{ item.product.title }}</h5>
+            <p>Quantity: {{ item.quantity }}</p>
+            {% if discount_for_score >= 20 %}
+                <p class="fw-bold">You Got {{ discount_for_score }}% Discount</p>
+                <p class="fw-bold">Price: ${{ per_item_discount_price|get_item:item.id }}</p>
+            {% else %}
+                <p class="fw-bold">Price: ${{ item.product.selling_price }}</p>
+            {% endif %}
         </div>
-      </div>
-    {% endfor %}
+    </div>
+{% endfor %}
+
+      <p class="fw-bold">Total price: {{total_discounted_price|add:70}}</p>
     {% endif %}
     <small>Term and Condition: Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia, ullam saepe! Iure optio repellat dolor velit, minus rem. Facilis cumque neque numquam laboriosam, accusantium adipisci nisi nihil in et quis?</small>
   </div>
@@ -67,8 +76,8 @@
       </form>
       {% else %}
     
-    <form action="/paymentdone">
-      
+    <form action="/paymentdone" method="post">
+      {% csrf_token %}
     {% for ad in add %}
       <div class="card">
         <div class="card-body">
