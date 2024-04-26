@@ -31,7 +31,7 @@
         <div class="card-body">
             <h5>Product: {{ item.product.title }}</h5>
             <p>Quantity: {{ item.quantity }}</p>
-            {% if discount_for_score >= 20 %}
+            {% if discount_for_score == 20 %}
                 <p class="fw-bold">You Got {{ discount_for_score }}% Discount</p>
                 <p class="fw-bold">Price: ${{ per_item_discount_price|get_item:item.id }}</p>
             {% else %}

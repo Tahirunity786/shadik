@@ -162,11 +162,11 @@ def checkout(request):
     for item in cart_items:
         original_price = Decimal(item.product.selling_price) * Decimal(item.quantity)
         total_original_price += original_price
-        print(item.product.title)
-        print(item.product.selling_price)
+        
 
         # Apply discount if the user qualifies
-        if score >= 20:
+        if score == 20:
+           
             discounted_price = original_price * Decimal('0.8')  # 20% discount
             per_item_discount_price[item.id] = discounted_price  # Store discounted price by item ID
         else:
@@ -524,7 +524,7 @@ def calculate_leader_score(price):
 
 # Function for analyzing leaderboard score and providing discount
 def analyzer(score):
-    if score > 20:
+    if score >= 20:
         # Return 20 percentage discount
         return 20
     else:
